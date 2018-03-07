@@ -103,6 +103,9 @@ def get_sentence2int(sentences,vocab_to_int):
     return reviews_ints
 X=get_sentence2int(sentences,vocab_to_int)
 
+
+
+
 # Training
 # ==================================================
 
@@ -235,7 +238,7 @@ with tf.Graph().as_default():
             predict_arr = []
             for ii in range(0, len(predict_X), 100):
                 for p in sess.run(cnn.predictions, feed_dict={cnn.input_x: predict_X[ii:ii + 100], cnn.dropout_keep_prob: 1.0}):
-                    predict_arr.append(np.argmax(p) + 1)
+                    predict_arr.append(p+1)
             with open('predict.txt','w') as fwrite:
                 for p in predict_arr:
                     fwrite.write('{}\n'.format(p))
