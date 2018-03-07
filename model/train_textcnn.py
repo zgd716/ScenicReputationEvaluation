@@ -27,7 +27,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 100, "Batch Size (default: 100)")
 tf.flags.DEFINE_integer("max_len", 100, "max length (default: 100)")
-tf.flags.DEFINE_integer("num_epochs", 200, "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("num_epochs", 100, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (default: 5)")
@@ -197,16 +197,16 @@ with tf.Graph().as_default():
             step, summaries, loss, accuracy = sess.run(
                 [global_step, dev_summary_op, cnn.loss, cnn.accuracy],
                 feed_dict)
-            time_str = datetime.datetime.now().isoformat()
-            print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
-            if writer:
-                writer.add_summary(summaries, step)
+            # time_str = datetime.datetime.now().isoformat()
+            # print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
+            # if writer:
+            #     writer.add_summary(summaries, step)
+            print('valid accuracy:{}'.format(accuracy))
 
-
-        x_train, x_dev, y_train, y_dev = train_test_split(X, Y, test_size=0.2)
+        x_train, x_dev, y_train, y_dev = train_test_split(X, Y, test_size=0.01)
         # Generate batches
         batches =batch_iter(
-            list(zip(x_train, y_train)), FLAGS.batch_size, FLAGS.num_epochs)
+            list(zip(x_train, y_train)), FLAGS.batch_size, FLAGS.num_epochs,shuffle=False)
         # Training loop. For each batch...
         for batch in batches:
             x_batch, y_batch = zip(*batch)
