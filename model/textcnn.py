@@ -74,7 +74,7 @@ class TextCNN(object):
             #self.predictions = tf.argmax(self.scores, 1, name="predictions")
 
         # CalculateMean cross-entropy loss
-        with tf.name_scope("loss"):
+        with tf.name_scope("loss"): 
             losses = tf.square(self.scores-self.input_y)
             self.loss = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
 
