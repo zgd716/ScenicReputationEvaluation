@@ -52,11 +52,11 @@ data = pd.read_csv('../data/train_first.csv')
 data = data.sample(frac=1).reset_index(drop=True)
 # 划分x  y
 X = data['Discuss']
-Y = data['Score']
+Y = data['Score'][:,None]
 # y ONEHOT
-lb = preprocessing.LabelBinarizer()
-lb.fit([1, 2, 3, 4, 5])
-Y = lb.transform(Y)
+# lb = preprocessing.LabelBinarizer()
+# lb.fit([1, 2, 3, 4, 5])
+# Y = lb.transform(Y)
 #加载停用词
 def get_stopwords(path):
     return [line.strip() for line in open(path,'r',encoding='utf-8').readlines()]
@@ -130,44 +130,8 @@ with tf.Graph().as_default():
         grads_and_vars = optimizer.compute_gradients(cnn.loss)
         train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
-        # Keep track of gradient values and sparsity (optional)
-        grad_summaries = []
-        for g, v in grads_and_vars:
-            if g is not None:
-                grad_hist_summary = tf.summary.histogram("{}/grad/hist".format(v.name), g)
-                sparsity_summary = tf.summary.scalar("{}/grad/sparsity".format(v.name), tf.nn.zero_fraction(g))
-                grad_summaries.append(grad_hist_summary)
-                grad_summaries.append(sparsity_summary)
-        grad_summaries_merged = tf.summary.merge(grad_summaries)
-
-        # Output directory for models and summaries
-        timestamp = str(int(time.time()))
-        out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp))
-        print("Writing to {}\n".format(out_dir))
-
         # Summaries for loss and accuracy
         loss_summary = tf.summary.scalar("loss", cnn.loss)
-        acc_summary = tf.summary.scalar("accuracy", cnn.accuracy)
-
-        # Train Summaries
-        train_summary_op = tf.summary.merge([loss_summary, acc_summary, grad_summaries_merged])
-        train_summary_dir = os.path.join(out_dir, "summaries", "train")
-        train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
-
-        # Dev summaries
-        dev_summary_op = tf.summary.merge([loss_summary, acc_summary])
-        dev_summary_dir = os.path.join(out_dir, "summaries", "dev")
-        dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, sess.graph)
-
-        # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
-        checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
-        checkpoint_prefix = os.path.join(checkpoint_dir, "model")
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
-        saver = tf.train.Saver(tf.global_variables(), max_to_keep=FLAGS.num_checkpoints)
-
-        # Write vocabulary
-        #vocab_processor.save(os.path.join(out_dir, "vocab"))
 
         # Initialize all variables
         sess.run(tf.global_variables_initializer())
@@ -181,47 +145,22 @@ with tf.Graph().as_default():
               cnn.input_y: y_batch,
               cnn.dropout_keep_prob: FLAGS.dropout_keep_prob
             }
-            _, step, summaries, loss, accuracy = sess.run(
-                [train_op, global_step, train_summary_op, cnn.loss, cnn.accuracy],
+            _, step,  loss = sess.run(
+                [train_op, global_step, cnn.loss],
                 feed_dict)
             time_str = datetime.datetime.now().isoformat()
-            print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
-            train_summary_writer.add_summary(summaries, step)
+            print("{}: step {}, loss {:g}".format(time_str, step, loss))
 
-        def dev_step(x_batch, y_batch, writer=None):
-            """
-            Evaluates model on a dev set
-            """
-            feed_dict = {
-              cnn.input_x: x_batch,
-              cnn.input_y: y_batch,
-              cnn.dropout_keep_prob: 1.0
-            }
-            step, summaries, loss, accuracy = sess.run(
-                [global_step, dev_summary_op, cnn.loss, cnn.accuracy],
-                feed_dict)
-            # time_str = datetime.datetime.now().isoformat()
-            # print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
-            # if writer:
-            #     writer.add_summary(summaries, step)
-            print('valid accuracy:{}'.format(accuracy))
 
-        x_train, x_dev, y_train, y_dev = train_test_split(X, Y, test_size=0.01)
         # Generate batches
         batches =batch_iter(
-            list(zip(x_train, y_train)), FLAGS.batch_size, FLAGS.num_epochs,shuffle=False)
+            list(zip(X, Y)), FLAGS.batch_size, FLAGS.num_epochs,shuffle=False)
         # Training loop. For each batch...
         for batch in batches:
             x_batch, y_batch = zip(*batch)
             train_step(x_batch, y_batch)
             current_step = tf.train.global_step(sess, global_step)
-            if current_step % FLAGS.evaluate_every == 0:
-                print("\nEvaluation:")
-                dev_step(x_dev, y_dev, writer=dev_summary_writer)
-                print("")
-            # if current_step % FLAGS.checkpoint_every == 0:
-            #     path = saver.save(sess, checkpoint_prefix, global_step=current_step)
-            #     print("Saved model checkpoint to {}\n".format(path))
+        saver = tf.train.Saver()
         saver.save(sess, "checkpoints/sentiment.ckpt")
 
 
@@ -237,8 +176,8 @@ with tf.Graph().as_default():
             saver.restore(sess, model_file)
             predict_arr = []
             for ii in range(0, len(predict_X), 100):
-                for p in sess.run(cnn.predictions, feed_dict={cnn.input_x: predict_X[ii:ii + 100], cnn.dropout_keep_prob: 1.0}):
-                    predict_arr.append(p+1)
+                for p in sess.run(cnn.scores, feed_dict={cnn.input_x: predict_X[ii:ii + 100], cnn.dropout_keep_prob: 1.0}):
+                    predict_arr.append(p)
             with open('predict.txt','w') as fwrite:
                 for p in predict_arr:
                     fwrite.write('{}\n'.format(p))
